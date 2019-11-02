@@ -2,11 +2,12 @@ import numpy as np
 import re
 from word2number import w2n
 from ..Db import query
-
+from flask import jsonify, Response
 # if __name__ == '__main__':
 #     from model_predict import (word_to_vec, predict, intents, slots, model)
 # else:
 from .model_predict import (word_to_vec, predict, intents, slots, model)
+from .core import gen_report
 
 responses = {
     "update_attribute": "Updating attribute %s to %s",
@@ -17,6 +18,15 @@ responses = {
     "won_hack": "Congratulations! incrementing your number of hackathons won by 1",
     "learnt_tech": "Great! incrementing your number of technologies learnt by 1",
     "send_report": ""
+}
+attr_index_to_name = {
+    4: "num_internships",
+    5: "num_hacks_part",
+    7: "comp_coding",
+    8: "num_hrs",
+    9: "num_tech",
+    12: "sports_part",
+    13: "debate_part"
 }
 
 
@@ -56,10 +66,6 @@ def check_num(s):
         return True
     except Exception as e:
         return False
-
-
-def gen_report(id):
-    return "report"+str(id)
 
 
 def response(ip, id, model):
@@ -134,7 +140,23 @@ def response(ip, id, model):
             return "Unable to access the database"
 
     elif ip_intent == "send_report":
-        return gen_report(id)
+        vals = query.select("SELECT * FROM students, attrs WHERE id=student_id and id=%s", (id,), dict_ret=False)[0]
+        print(vals)
+        predicted_cgpa, predicted_class, req_attrs = gen_report(vals[6:], id, vals[2],
+                                                                [{"attr_index": 4, "ub": 10, "inc": 1},
+                                                                 {"attr_index": 5, "ub": 10, "inc": 1},
+                                                                 {"attr_index": 9, "ub": 15, "inc": 1},
+                                                                 {"attr_index": 7, "ub": 1, "inc": 1},
+                                                                 {"attr_index": 8, "ub": 5, "inc": 0.5},
+                                                                 {"attr_index": 12, "ub": 1, "inc": 1},
+                                                                 {"attr_index": 13, "ub": 1, "inc": 1}])
+
+        n_req = {}
+        for k in req_attrs:
+            n_req[attr_index_to_name[k]] = float(str(req_attrs[k]))
+        return jsonify({"predicted_cgpa": predicted_cgpa,
+                        "predicted_class": predicted_class,
+                        "req_attrs": n_req})
 
     return "Err"
 
