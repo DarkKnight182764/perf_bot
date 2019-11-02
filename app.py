@@ -30,22 +30,37 @@ def auth(f):
     return wrapper
 
 
-@app.route("/login", methods=["POST"], endpoint="login")
+@app.route("/login/<type>", methods=["POST"], endpoint="login")
 @log
-def login():
+def login(type):  # type is student or teacher
     body = request.get_json()
     if body:
-        if "uid" in body and "pwd" in body:
-            res = select("SELECT * FROM students WHERE college_uid=%s;", (body["uid"],))
-            if res[0]["password"] == body["pwd"]:
-                r = Response({
-                    "bearer_token": jwt.encode({"id": res[0]["id"]}, "secret")
-                })
-                r.headers.set('Access-Control-Allow-Origin', "*")
-                r.set_cookie("bearer_token", jwt.encode({"id": res[0]["id"]}, "secret"), domain="127.0.0.1",
-                             max_age=10000,
-                             samesite=False)
-                return r
+        if type == "student":
+            if "uid" in body and "pwd" in body:
+                res = select("SELECT * FROM students WHERE college_uid=%s;", (body["uid"],))
+                if res:
+                    if res["password"] == body["pwd"]:
+                        r = Response({
+                            "bearer_token": jwt.encode({"id": res["id"]}, "secret")
+                        })
+                        r.headers.set('Access-Control-Allow-Origin', "*")
+                        r.set_cookie("bearer_token", jwt.encode({"id": res["id"]}, "secret"), domain="127.0.0.1",
+                                     max_age=10000,
+                                     samesite=False)
+                        return r
+        elif type == "teacher":
+            if "tid" in body and "pwd" in body:
+                res = select("SELECT * FROM teachers WHERE college_tid=%s;", (body["tid"],))
+                if res:
+                    if res["password"] == body["pwd"]:
+                        r = Response({
+                            "bearer_token": jwt.encode({"id": res["id"]}, "secret")
+                        })
+                        r.headers.set('Access-Control-Allow-Origin', "*")
+                        r.set_cookie("bearer_token", jwt.encode({"id": res["id"]}, "secret"), domain="127.0.0.1",
+                                     max_age=10000,
+                                     samesite=False)
+                        return r
     return "Invalid username or password", 401
 
 
@@ -54,11 +69,13 @@ def login():
 @auth
 def chat():
     if "mesg" in request.args:
-        r = Response(
-            response=response.response(request.args.get("mesg"),
-                                       jwt.decode(request.cookies["bearer_token"], "secret")["id"],
-                                       response.model))
-        return r
+        # r = Response(
+        #     response=response.response(request.args.get("mesg"),
+        #                                jwt.decode(request.cookies["bearer_token"], "secret")["id"],
+        #                                response.model))
+        return response.response(request.args.get("mesg"),
+                                 jwt.decode(request.cookies["bearer_token"], "secret")["id"],
+                                 response.model)
     else:
         return "The mesg arg is absent", 400
 
@@ -78,3 +95,31 @@ def f():
             select("SELECT * FROM students,attrs WHERE student_id = id and name=%s;", (args["student_name"],)))
     else:
         return "required arg not found", 400
+
+
+@app.route("/teachers-data", methods=["GET"], endpoint="teachers-data")
+@log
+@auth
+def f():
+    args = request.args
+    if "tid" in args:
+        return jsonify(
+            select("SELECT * FROM teachers WHERE college_tid=%s;", (args["tid"],)))
+    elif "branch" in args:
+        return jsonify(select("SELECT * FROM teachers WHERE branch=%s;", (args["branch"],)))
+    elif "teacher_name" in args:
+        return jsonify(
+            select("SELECT * FROM teachers WHERE name=%s;", (args["teacher_name"],)))
+    else:
+        return "required arg not found", 400
+
+
+@app.route("/batch-data", methods=["GET"], endpoint="batch-data")
+@log
+@auth
+def f():
+    args = request.args
+    if "branch" in args:
+        return jsonify(select("SELECT * FROM batch WHERE branch = %s;", (args["branch"],)))
+    elif "bid" in args:
+        return jsonify(select("SELECT * FROM batch_students, students WHERE student_id = id AND bid = %s", args["bid"]))
