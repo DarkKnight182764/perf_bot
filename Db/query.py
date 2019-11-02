@@ -8,7 +8,9 @@ conn_pool = pool.SimpleConnectionPool(minconn=1, maxconn=10, user="postgres",
                                       database="perf_bot")
 
 
-def select(query, params):
+def select(query, params, dict_ret=True):
+    if type(params) is not tuple:
+        params = (params,)
     cursor = None
     conn = None
     try:
@@ -17,14 +19,17 @@ def select(query, params):
         cursor.execute(query, params)
         descr = cursor.description
         fa = cursor.fetchall()
-        res = []
-        for i, row in enumerate(fa):
-            res.append({})
-            for col, val in zip(descr, row):
-                res[i][col.name] = val
-        if len(res) == 1:
-            res = res[0]
-        return res
+        if dict_ret:
+            res = []
+            for i, row in enumerate(fa):
+                res.append({})
+                for col, val in zip(descr, row):
+                    res[i][col.name] = val
+            if len(res) == 1:
+                res = res[0]
+            return res
+        else:
+            return fa
     except Exception as e:
         print("Db access exception")
         print(e)
