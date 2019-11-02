@@ -2,17 +2,43 @@ import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
+from tensorflow.python.keras.backend import set_session
+import matplotlib.pyplot as plt
 
-cgpa_model = keras.models.load_model("../data/cgpa_e1900.h5")
+sess = tf.Session()
+graph = tf.get_default_graph()
+set_session(sess)
+
+cgpa_model = keras.models.load_model("data/cgpa_e1900.h5")
 print("loaded cgpa model")
-class_model = keras.models.load_model("../data/class_e1600.h5")
+class_model = keras.models.load_model("data/class_e1600.h5")
 print("loaded class model")
 
-def gen_report(attrs, uid, name):  # attrs should be (1,14)
-    predicted_cgpa = cgpa_model.predict(attrs, batch_size=1)[0, 0]
-    predicted_class = list(class_model.predict(attrs, batch_size=1)[0])
-    predicted_class_prob = max(predicted_class)
-    predicted_class = predicted_class.index(max(predicted_class))
+
+def gen_report(attrs, uid, name, attrs_incl):  # attrs should be (1,14)
+    global graph, sess
+    with graph.as_default():
+        set_session(sess)
+        attrs = np.array(attrs)
+        attrs = np.reshape(attrs, (1, 14))
+        predicted_cgpa = float(cgpa_model.predict(attrs)[0, 0])
+        predicted_class = list(class_model.predict(attrs, batch_size=1)[0])
+        predicted_class_prob = max(predicted_class)
+        predicted_class = predicted_class.index(max(predicted_class))
+        attr_req_amts = {}
+        if predicted_class != 2:
+            for attr in attrs_incl:
+                attr_req_amts[attr["attr_index"]] = -1
+                temp_attrs = attrs.copy()
+                for i in np.arange(attrs[0, attr["attr_index"]], attr["ub"] + 0.1, attr["inc"]):
+                    i = float(i)
+                    temp_attrs[0, attr["attr_index"]] = i
+                    new_pred_class = class_model.predict(temp_attrs)[0, 0]
+                    if new_pred_class > predicted_cgpa:
+                        attr_req_amts[attr["attr_index"]] = i
+                        break
+
+    return predicted_cgpa, predicted_class, attr_req_amts
 
 
 def predict(prediction):
