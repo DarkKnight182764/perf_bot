@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, Response
 from .Cb import response
 import jwt
+import json
 from .Db.query import select, insert_update
 
 app = Flask(__name__)
@@ -40,11 +41,11 @@ def login(type):  # type is student or teacher
                 res = select("SELECT * FROM students WHERE college_uid=%s;", (body["uid"],))
                 if res:
                     if res["password"] == body["pwd"]:
-                        r = Response({
-                            "bearer_token": jwt.encode({"id": res["id"]}, "secret")
-                        })
+                        token = jwt.encode({"id": res["id"]}, "secret")
+                        res["bearer_token"] = token
+                        r = Response(response=json.dumps(res), content_type="application/json")
                         r.headers.set('Access-Control-Allow-Origin', "*")
-                        r.set_cookie("bearer_token", jwt.encode({"id": res["id"]}, "secret"), domain="127.0.0.1",
+                        r.set_cookie("bearer_token", token, domain="127.0.0.1",
                                      max_age=10000,
                                      samesite=False)
                         return r
@@ -53,11 +54,11 @@ def login(type):  # type is student or teacher
                 res = select("SELECT * FROM teachers WHERE college_tid=%s;", (body["tid"],))
                 if res:
                     if res["password"] == body["pwd"]:
-                        r = Response({
-                            "bearer_token": jwt.encode({"id": res["id"]}, "secret")
-                        })
+                        token = jwt.encode({"id": res["id"]}, "secret")
+                        res["bearer_token"] = token
+                        r = Response(response=json.dumps(res), content_type="application/json")
                         r.headers.set('Access-Control-Allow-Origin', "*")
-                        r.set_cookie("bearer_token", jwt.encode({"id": res["id"]}, "secret"), domain="127.0.0.1",
+                        r.set_cookie("bearer_token", token, domain="127.0.0.1",
                                      max_age=10000,
                                      samesite=False)
                         return r
